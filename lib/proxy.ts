@@ -49,11 +49,43 @@ function buildUpstreamHeaders(req: NextRequest, target: URL): Headers {
   return headers;
 }
 
-function copyResponseHeaders(src: Headers): Headers {
+function rewriteLocation(loc: string, req: NextRequest, upstream: URL): string {
+  const ourOrigin = new URL(req.url).origin;
+  let parsed: URL;
+  try {
+    // Absolute URL?
+    parsed = new URL(loc);
+  } catch {
+    // Relative — resolve against the request URL (yields absolute on our origin).
+    // Next.js's Response constructor rejects relative Location headers, so we
+    // must hand it an absolute URL even though the relative form is HTTP-spec valid.
+    return new URL(loc, req.url).toString();
+  }
+  // Absolute pointing at OpenEMR — rewrite to our origin so the browser stays
+  // on the proxy.
+  if (parsed.protocol === upstream.protocol && parsed.host === upstream.host) {
+    return new URL(
+      parsed.pathname + parsed.search + parsed.hash,
+      ourOrigin,
+    ).toString();
+  }
+  return loc;
+}
+
+function copyResponseHeaders(
+  src: Headers,
+  req: NextRequest,
+  upstream: URL,
+): Headers {
   const out = new Headers();
   for (const [name, value] of src) {
-    if (STRIPPED_RESPONSE_HEADERS.has(name.toLowerCase())) continue;
-    out.append(name, value);
+    const lower = name.toLowerCase();
+    if (STRIPPED_RESPONSE_HEADERS.has(lower)) continue;
+    if (lower === "location") {
+      out.append(name, rewriteLocation(value, req, upstream));
+    } else {
+      out.append(name, value);
+    }
   }
   return out;
 }
@@ -104,6 +136,6 @@ export async function proxyToOpenEMR(
   return new NextResponse(upstream.body, {
     status: upstream.status,
     statusText: upstream.statusText,
-    headers: copyResponseHeaders(upstream.headers),
+    headers: copyResponseHeaders(upstream.headers, req, target),
   });
 }
