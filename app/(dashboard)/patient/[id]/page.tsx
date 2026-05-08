@@ -4,12 +4,7 @@ import { CareTeamCard } from "@/components/cards/CareTeamCard";
 import { MedicationsCard } from "@/components/cards/MedicationsCard";
 import { PrescriptionsCard } from "@/components/cards/PrescriptionsCard";
 import { ProblemsCard } from "@/components/cards/ProblemsCard";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { EncountersPreview } from "@/components/EncountersPreview";
 
 export const runtime = "nodejs";
 
@@ -46,14 +41,9 @@ export default async function PatientDashboardPage({
         <CareTeamCard patientId={id} />
       </CardShell>
 
-      <Card aria-labelledby="card-encounters-title">
-        <CardHeader>
-          <CardTitle id="card-encounters-title">Recent Encounters</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-sm">Lands in Phase 5.</p>
-        </CardContent>
-      </Card>
+      <CardShell title="Recent Encounters">
+        <EncountersPreview patientId={id} />
+      </CardShell>
     </div>
   );
 }
