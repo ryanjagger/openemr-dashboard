@@ -33,14 +33,26 @@ const securityHeaders = [
   },
 ];
 
+// Limit our security headers to app-owned routes. Proxied routes (anything
+// not matched here) inherit whatever OpenEMR's Apache sends so the legacy
+// PHP UI keeps rendering — its inline scripts would be killed by our
+// strict CSP. Production hardening (one CSP across the whole hostname)
+// is phase-2+ work after the PHP UI has been ported away.
+const APP_ROUTE_SOURCES = [
+  "/",
+  "/login",
+  "/callback",
+  "/logout",
+  "/api/:path*",
+  "/patient/:path*",
+];
+
 const nextConfig: NextConfig = {
   async headers() {
-    return [
-      {
-        source: "/:path*",
-        headers: securityHeaders,
-      },
-    ];
+    return APP_ROUTE_SOURCES.map((source) => ({
+      source,
+      headers: securityHeaders,
+    }));
   },
 };
 

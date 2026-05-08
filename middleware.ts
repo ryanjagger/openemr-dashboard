@@ -1,31 +1,28 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { log } from "@/lib/log";
+import { proxyToOpenEMR } from "@/lib/proxy";
 
 export const runtime = "nodejs";
 
-const PUBLIC_PREFIXES = [
+// Paths owned by the Next.js app — never proxied.
+const APP_ROUTES = new Set([
+  "/",
   "/login",
   "/callback",
   "/logout",
-  "/api/health",
-  "/_next",
   "/favicon.ico",
-];
+]);
 
-function isPublic(pathname: string): boolean {
-  if (pathname === "/") return true;
-  return PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+const APP_PREFIXES = ["/api/", "/patient/"];
+
+function isAppOwned(pathname: string): boolean {
+  if (APP_ROUTES.has(pathname)) return true;
+  return APP_PREFIXES.some((p) => pathname.startsWith(p));
 }
 
-export async function middleware(req: NextRequest) {
+async function gateOrPass(req: NextRequest): Promise<NextResponse> {
   const { pathname, search } = req.nextUrl;
-  if (isPublic(pathname)) return NextResponse.next();
-
-  // Phase 1 scope: gate /patient/*. Phase 2 will extend this with the
-  // reverse-proxy fallback for unmatched routes.
-  if (!pathname.startsWith("/patient")) return NextResponse.next();
-
   const session = await getSession();
   log.debug(
     { pathname, hasToken: Boolean(session.accessToken), userId: session.userId },
@@ -39,9 +36,23 @@ export async function middleware(req: NextRequest) {
   return NextResponse.next();
 }
 
+export async function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+
+  // Authed app routes (the dashboard).
+  if (pathname.startsWith("/patient/")) return gateOrPass(req);
+
+  // Other app-owned routes pass through to Next.js.
+  if (isAppOwned(pathname)) return NextResponse.next();
+
+  // Everything else is proxied to OpenEMR's Apache so the legacy PHP UI,
+  // OAuth2 endpoints, and FHIR/REST APIs stay reachable through one host.
+  return proxyToOpenEMR(req);
+}
+
 export const config = {
-  matcher: [
-    // Apply middleware to everything except static asset paths.
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff2?)).*)",
-  ],
+  // Run middleware on every path *except* Next.js's own static bundles.
+  // OpenEMR's static assets (e.g. /interface/themes/style.css) must hit
+  // middleware so the proxy can reach them.
+  matcher: ["/((?!_next/static|_next/image).*)"],
 };
