@@ -1,0 +1,90 @@
+# patient-summary-bridge-link.patch
+#
+# Adds a "New Dashboard" link to OpenEMR's patient left-nav. The link
+# opens the new Next.js dashboard for the patient currently in context
+# (uses pid because that's what OpenEMR's PHP UI carries in session;
+# the dashboard resolves pid → FHIR Patient.id server-side).
+#
+# This is a SNIPPET + APPLY GUIDE rather than a strict unified diff
+# because OpenEMR's left-nav template drifts between versions and themes.
+# See openemr-patches/README.md for context.
+
+# ─────────────────────────────────────────────────────────────────────
+# 1. WHERE TO PUT IT
+# ─────────────────────────────────────────────────────────────────────
+#
+# Target file: interface/main/left_nav.php (8.1.x — older builds may
+# use interface/themes/<theme>/left_nav.html.twig, in which case adapt
+# to Twig syntax).
+#
+# Insertion point: inside the patient-context block — i.e. the section
+# that's only rendered when $_SESSION['pid'] is populated, near other
+# patient-scoped links like "Demographics", "Issues", "History". Search
+# left_nav.php for `set_pid` or `pid=' . attr_url($pid)` to find the
+# block.
+
+# ─────────────────────────────────────────────────────────────────────
+# 2. SNIPPET TO ADD
+# ─────────────────────────────────────────────────────────────────────
+
+--- a/interface/main/left_nav.php
++++ b/interface/main/left_nav.php
+@@ -<line number of nearest patient-scoped <li>>,7 +<line number>,18 @@
+   <!-- existing patient-scoped left-nav items: Demographics, Issues, etc. -->
+   <li><a href="...existing link..." target="...">Existing Item</a></li>
+
++  <?php
++  // ─── New Next.js Dashboard bridge link ────────────────────────────
++  // Opens the modern dashboard for the current patient in the same tab.
++  // Configure the target via Administration → Globals → System →
++  // "new_dashboard_url" (defaults to http://localhost:3000 for dev).
++  $newDashboardUrl = $GLOBALS['new_dashboard_url'] ?? 'http://localhost:3000';
++  $bridgePid = $_SESSION['pid'] ?? null;
++  if (!empty($bridgePid)) {
++      $bridgeHref = rtrim($newDashboardUrl, '/')
++          . '/patient/'
++          . urlencode((string) $bridgePid);
++      echo '<li><a href="' . attr($bridgeHref) . '" target="_self" '
++          . 'class="new-dashboard-bridge">New Dashboard</a></li>';
++  }
++  ?>
++
+   <!-- continue with existing patient-scoped left-nav items -->
+
+# ─────────────────────────────────────────────────────────────────────
+# 3. NOTES
+# ─────────────────────────────────────────────────────────────────────
+#
+# - `attr()` is OpenEMR's HTML-attribute escaper (defined in
+#   library/htmlspecialchars.inc.php). If you're somehow on a build
+#   where that helper isn't available, fall back to
+#   `htmlspecialchars($bridgeHref, ENT_QUOTES, 'UTF-8')`.
+#
+# - target="_self" intentional — clinicians should navigate, not get a
+#   new tab they have to manage.
+#
+# - The dashboard accepts pid because that's what OpenEMR carries in
+#   session. Server-side, the dashboard's /patient/[id] layout resolves
+#   pid → FHIR Patient.id by Patient.identifier search before fetching
+#   the resource. (See lib/fhir/queries.ts → getPatient and the
+#   project memory note on OpenEMR 8.1.x's identifier mapping.)
+#
+# - If your OpenEMR theme uses Twig instead of inline PHP, the
+#   equivalent template snippet is roughly:
+#
+#       {% if app.session.get('pid') %}
+#         {% set _bridge_href = (globals.new_dashboard_url|default('http://localhost:3000'))
+#               ~ '/patient/' ~ (app.session.get('pid')|url_encode) %}
+#         <li><a href="{{ _bridge_href }}" target="_self"
+#                class="new-dashboard-bridge">New Dashboard</a></li>
+#       {% endif %}
+
+# ─────────────────────────────────────────────────────────────────────
+# 4. ACCEPTANCE
+# ─────────────────────────────────────────────────────────────────────
+#
+# - Open OpenEMR's PHP UI, pick a patient (so $_SESSION['pid'] is set).
+# - The patient left-nav now has a "New Dashboard" item.
+# - Clicking it navigates to <new_dashboard_url>/patient/<pid> in the
+#   same tab. With shared SSO, the new dashboard renders without a
+#   second login prompt.
