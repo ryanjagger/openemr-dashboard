@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { serverEnv } from "@/lib/env";
+import { publicEnv, serverEnv } from "@/lib/env";
 import { openemrFetch } from "@/lib/http";
 import { log } from "@/lib/log";
 
@@ -50,16 +50,19 @@ function buildUpstreamHeaders(req: NextRequest, target: URL): Headers {
 }
 
 function rewriteLocation(loc: string, req: NextRequest, upstream: URL): string {
-  const ourOrigin = new URL(req.url).origin;
+  // Use the configured public URL as our origin. Behind Railway's edge,
+  // req.url often resolves to the internal http://0.0.0.0:3000 address and
+  // would rewrite Location headers to that unreachable host.
+  const ourOrigin = new URL(publicEnv().NEXT_PUBLIC_APP_URL).origin;
   let parsed: URL;
   try {
     // Absolute URL?
     parsed = new URL(loc);
   } catch {
-    // Relative — resolve against the request URL (yields absolute on our origin).
-    // Next.js's Response constructor rejects relative Location headers, so we
-    // must hand it an absolute URL even though the relative form is HTTP-spec valid.
-    return new URL(loc, req.url).toString();
+    // Relative — resolve against our public origin so the browser stays on
+    // the proxy. Next.js's Response constructor rejects relative Location
+    // headers, so we must hand it an absolute URL.
+    return new URL(loc, ourOrigin).toString();
   }
   // Absolute pointing at OpenEMR — rewrite to our origin so the browser stays
   // on the proxy.

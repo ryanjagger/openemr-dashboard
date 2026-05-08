@@ -48,6 +48,7 @@ const APP_ROUTE_SOURCES = [
 ];
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   async headers() {
     return APP_ROUTE_SOURCES.map((source) => ({
       source,

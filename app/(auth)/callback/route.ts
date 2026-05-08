@@ -1,8 +1,26 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { exchangeCodeForTokens, getIdTokenClaims } from "@/lib/auth/oauth";
 import { getSession } from "@/lib/auth/session";
-import { serverEnv } from "@/lib/env";
+import { publicEnv, serverEnv } from "@/lib/env";
+import { fhirGet } from "@/lib/fhir/client";
+import { BundleSchema } from "@/lib/fhir/schemas";
 import { log } from "@/lib/log";
+
+async function discoverFirstPatientId(
+  session: Awaited<ReturnType<typeof getSession>>,
+): Promise<string | undefined> {
+  try {
+    const bundle = await fhirGet<fhir4.Bundle>(session, "/Patient", {
+      searchParams: { _count: "1" },
+      schema: BundleSchema as never,
+    });
+    const id = bundle.entry?.[0]?.resource?.id;
+    return typeof id === "string" && id.length > 0 ? id : undefined;
+  } catch (err) {
+    log.warn({ err }, "auth.callback.patient_discover_failed");
+    return undefined;
+  }
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,9 +33,11 @@ export async function GET(req: NextRequest) {
   const expectedNonce = session.nonce;
   const returnTo = session.returnTo;
 
+  const publicBase = publicEnv().NEXT_PUBLIC_APP_URL;
+
   if (!expectedState || !codeVerifier) {
     log.warn("auth.callback.missing_pkce_or_state");
-    return NextResponse.redirect(new URL("/login", req.url));
+    return NextResponse.redirect(new URL("/login", publicBase));
   }
 
   let result;
@@ -65,10 +85,14 @@ export async function GET(req: NextRequest) {
   );
 
   const env = serverEnv();
-  const dest =
-    returnTo ??
-    (env.TEST_PATIENT_ID
-      ? `/patient/${env.TEST_PATIENT_ID}`
-      : "/patient/placeholder");
-  return NextResponse.redirect(new URL(dest, req.url));
+  let dest: string;
+  if (returnTo) {
+    dest = returnTo;
+  } else if (env.TEST_PATIENT_ID) {
+    dest = `/patient/${env.TEST_PATIENT_ID}`;
+  } else {
+    const discovered = await discoverFirstPatientId(session);
+    dest = discovered ? `/patient/${discovered}` : "/patient/placeholder";
+  }
+  return NextResponse.redirect(new URL(dest, publicBase));
 }

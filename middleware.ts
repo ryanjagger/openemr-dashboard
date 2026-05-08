@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { publicEnv } from "@/lib/env";
 import { log } from "@/lib/log";
 import { proxyToOpenEMR } from "@/lib/proxy";
 
@@ -29,7 +30,7 @@ async function gateOrPass(req: NextRequest): Promise<NextResponse> {
     "middleware.gate",
   );
   if (!session.accessToken) {
-    const loginUrl = new URL("/login", req.url);
+    const loginUrl = new URL("/login", publicEnv().NEXT_PUBLIC_APP_URL);
     loginUrl.searchParams.set("returnTo", `${pathname}${search}`);
     return NextResponse.redirect(loginUrl);
   }
