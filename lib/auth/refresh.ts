@@ -1,4 +1,3 @@
-import type { IronSession } from "iron-session";
 import { refreshTokens } from "@/lib/auth/oauth";
 import type { Session } from "@/lib/auth/session";
 import { log } from "@/lib/log";
@@ -24,9 +23,7 @@ export class RefreshFailedError extends Error {
  * Refresh the session's access token if it's near/past expiry. Mutates and
  * persists the session in place. Returns true if a refresh occurred.
  */
-export async function refreshIfNeeded(
-  session: IronSession<Session>,
-): Promise<boolean> {
+export async function refreshIfNeeded(session: Session): Promise<boolean> {
   if (!session.accessToken) return false;
   if (!session.refreshToken) return false;
   if (!isExpired(session)) return false;

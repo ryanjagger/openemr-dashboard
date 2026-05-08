@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { log } from "@/lib/log";
 
 export const runtime = "nodejs";
 
@@ -26,6 +27,10 @@ export async function middleware(req: NextRequest) {
   if (!pathname.startsWith("/patient")) return NextResponse.next();
 
   const session = await getSession();
+  log.debug(
+    { pathname, hasToken: Boolean(session.accessToken), userId: session.userId },
+    "middleware.gate",
+  );
   if (!session.accessToken) {
     const loginUrl = new URL("/login", req.url);
     loginUrl.searchParams.set("returnTo", `${pathname}${search}`);

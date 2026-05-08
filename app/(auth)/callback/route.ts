@@ -22,8 +22,11 @@ export async function GET(req: NextRequest) {
 
   let result;
   try {
+    // oauth4webapi does an instanceof URL check on the callback URL; Next's
+    // NextURL fails that check, so re-wrap as a plain URL.
+    const callbackUrl = new URL(req.url);
     result = await exchangeCodeForTokens({
-      callbackUrl: req.nextUrl,
+      callbackUrl,
       expectedState,
       expectedNonce,
       codeVerifier,

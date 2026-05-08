@@ -31,7 +31,7 @@ export default async function PatientDashboardPlaceholder({
           <dd className="font-mono">{id}</dd>
 
           <dt className="font-medium">Logged in as</dt>
-          <dd className="font-mono">
+          <dd className="font-mono break-all">
             {session.fhirUser ?? session.userId ?? "(unknown)"}
           </dd>
 
