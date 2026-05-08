@@ -20,14 +20,14 @@ export class RefreshFailedError extends Error {
 }
 
 /**
- * Refresh the session's access token if it's near/past expiry. Mutates and
- * persists the session in place. Returns true if a refresh occurred.
+ * Force a refresh — used by the FHIR client on 401 (the server rejected
+ * the token even though our local expiresAt may still look valid).
+ * Mutates and persists the session in place.
  */
-export async function refreshIfNeeded(session: Session): Promise<boolean> {
-  if (!session.accessToken) return false;
-  if (!session.refreshToken) return false;
-  if (!isExpired(session)) return false;
-
+export async function forceRefresh(session: Session): Promise<void> {
+  if (!session.refreshToken) {
+    throw new RefreshFailedError("No refresh token in session");
+  }
   log.debug({ userId: session.userId }, "auth.refresh.start");
   try {
     const result = await refreshTokens(session.refreshToken);
@@ -38,11 +38,22 @@ export async function refreshIfNeeded(session: Session): Promise<boolean> {
       Math.floor(Date.now() / 1000) + Number(result.expires_in ?? 3600);
     await session.save();
     log.info({ userId: session.userId }, "auth.refresh.ok");
-    return true;
   } catch (err) {
     log.warn({ err, userId: session.userId }, "auth.refresh.failed");
     throw new RefreshFailedError("Failed to refresh access token", {
       cause: err,
     });
   }
+}
+
+/**
+ * Refresh the session's access token if it's near/past expiry. Mutates
+ * and persists the session in place. Returns true if a refresh occurred.
+ */
+export async function refreshIfNeeded(session: Session): Promise<boolean> {
+  if (!session.accessToken) return false;
+  if (!session.refreshToken) return false;
+  if (!isExpired(session)) return false;
+  await forceRefresh(session);
+  return true;
 }
