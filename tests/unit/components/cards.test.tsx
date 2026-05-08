@@ -330,25 +330,21 @@ describe("CareTeamCardView", () => {
 // ─────────────────────────────────────────────── CardErrorBoundary smoke
 
 describe("CardErrorBoundary", () => {
-  it("catches a render error and shows fallback", () => {
+  it("catches a render error and shows the per-card fallback", () => {
     // Suppress the expected error in test output.
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     function Boom(): never {
       throw new Error("boom");
     }
     render(
-      <CardErrorBoundary
-        fallback={({ error, reset }) => (
-          <div>
-            <p>fallback: {error.message}</p>
-            <button onClick={reset}>reset</button>
-          </div>
-        )}
-      >
+      <CardErrorBoundary title="Allergies">
         <Boom />
       </CardErrorBoundary>,
     );
-    expect(screen.getByText("fallback: boom")).toBeInTheDocument();
+    expect(screen.getByText(/Couldn.t load allergies/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /retry/i }),
+    ).toBeInTheDocument();
     spy.mockRestore();
   });
 });

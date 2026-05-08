@@ -28,39 +28,6 @@ function DefaultSkeleton({ title }: { title: string }) {
   );
 }
 
-function ErrorFallback({
-  title,
-  reset,
-}: {
-  title: string;
-  reset: () => void;
-}) {
-  const id = `card-${slug(title)}-title`;
-  return (
-    <Card
-      aria-labelledby={id}
-      className="border-destructive/40"
-      role="region"
-    >
-      <CardHeader>
-        <CardTitle id={id}>{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <p className="text-sm text-muted-foreground">
-          Couldn&apos;t load {title.toLowerCase()}.
-        </p>
-        <button
-          type="button"
-          onClick={reset}
-          className="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          Retry
-        </button>
-      </CardContent>
-    </Card>
-  );
-}
-
 /**
  * Per-card Suspense + error boundary. Wrap each Server-Component card
  * with this so cards stream in independently and one card's failure
@@ -76,9 +43,7 @@ export function CardShell({
   skeleton?: ReactNode;
 }) {
   return (
-    <CardErrorBoundary
-      fallback={({ reset }) => <ErrorFallback title={title} reset={reset} />}
-    >
+    <CardErrorBoundary title={title}>
       <Suspense fallback={skeleton ?? <DefaultSkeleton title={title} />}>
         {children}
       </Suspense>
