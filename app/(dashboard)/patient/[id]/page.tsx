@@ -1,57 +1,35 @@
-import { getSession } from "@/lib/auth/session";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
-type Params = Promise<{ id: string }>;
-
-export default async function PatientDashboardPlaceholder({
-  params,
-}: {
-  params: Params;
-}) {
-  const { id } = await params;
-  const session = await getSession();
-  const expiresAtIso = session.expiresAt
-    ? new Date(session.expiresAt * 1000).toISOString()
-    : "—";
-
+/**
+ * Phase 3 placeholder body — the patient header is rendered by the
+ * surrounding layout. The five clinical cards land in Phase 4 and
+ * the encounters preview in Phase 5; this skeleton just keeps the
+ * grid in place so the layout is visually settled.
+ */
+export default function PatientDashboardPage() {
   return (
-    <main className="mx-auto max-w-3xl space-y-6 p-8 font-sans">
-      <header>
-        <h1 className="text-2xl font-semibold">Patient dashboard (placeholder)</h1>
-        <p className="text-muted-foreground text-sm">
-          Phase 1 acceptance shim — replaced in Phase 3 by the real header + cards.
-        </p>
-      </header>
-
-      <section className="rounded-lg border p-6">
-        <dl className="grid grid-cols-[10rem_1fr] gap-y-2 text-sm">
-          <dt className="font-medium">Route param :id</dt>
-          <dd className="font-mono">{id}</dd>
-
-          <dt className="font-medium">Logged in as</dt>
-          <dd className="font-mono break-all">
-            {session.fhirUser ?? session.userId ?? "(unknown)"}
-          </dd>
-
-          <dt className="font-medium">User id (sub)</dt>
-          <dd className="font-mono">{session.userId ?? "—"}</dd>
-
-          <dt className="font-medium">Access token expires</dt>
-          <dd className="font-mono">{expiresAtIso}</dd>
-
-          <dt className="font-medium">Has refresh token</dt>
-          <dd className="font-mono">{session.refreshToken ? "yes" : "no"}</dd>
-        </dl>
-      </section>
-
-      <p className="text-muted-foreground text-sm">
-        <a className="underline" href="/logout">
-          Sign out
-        </a>
-        {" — destroys the Next.js session and ends the OpenEMR SSO session."}
-      </p>
-    </main>
+    <div className="grid gap-4 md:grid-cols-2" aria-label="Clinical cards">
+      {[
+        { id: "allergies", title: "Allergies" },
+        { id: "problems", title: "Problem List" },
+        { id: "medications", title: "Medications" },
+        { id: "prescriptions", title: "Prescriptions" },
+        { id: "care-team", title: "Care Team" },
+        { id: "encounters", title: "Recent Encounters" },
+      ].map((card) => (
+        <Card key={card.id} aria-labelledby={`card-${card.id}-title`}>
+          <CardHeader>
+            <CardTitle id={`card-${card.id}-title`}>{card.title}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground text-sm">
+              Lands in Phase 4 / Phase 5.
+            </p>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
   );
 }
