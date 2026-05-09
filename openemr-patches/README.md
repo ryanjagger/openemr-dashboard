@@ -8,12 +8,11 @@ not in this repo.
 
 | File | What it does |
 |---|---|
-| [`patient-summary-bridge-link.patch`](./patient-summary-bridge-link.patch) | Adds a "New Dashboard" link to OpenEMR's patient left-nav. Opens the new Next.js dashboard for the patient currently in context. |
+| [`patient-summary-bridge-link.patch`](./patient-summary-bridge-link.patch) | Wires OpenEMR patient menu "New Dashboard" to launch-aware embedded dashboard tabs and adds a friendly tab-title fallback. |
 
 ## Why these aren't strict `git apply`-able diffs
 
-OpenEMR's `interface/main/left_nav.php` (and the theme-specific
-includes that render the patient nav block) drift between versions.
+OpenEMR source locations and surrounding blocks can drift between versions.
 Rather than ship a unified diff that will fail on any release except
 the one it was authored against, each patch in this directory is a
 **snippet + apply guide** — you locate the right file/insertion point
@@ -30,9 +29,9 @@ git checkout -b new-dashboard-bridge
 # PHP snippet to add and notes on where to put it.
 $EDITOR path/to/openemr-dashboard/openemr-patches/patient-summary-bridge-link.patch
 
-# Make the edit, then commit on your fork.
-git add interface/main/left_nav.php
-git commit -m "feat(nav): bridge link to new Next.js dashboard"
+# Make the edits, then commit on your fork.
+git add src/Menu/PatientMenuRole.php interface/main/tabs/js/custom_bindings.js
+git commit -m "feat(nav): launch-aware embedded new dashboard tab bridge"
 ```
 
 ## Configuration

@@ -1,112 +1,101 @@
 # patient-summary-bridge-link.patch
 #
-# Adds a "New Dashboard" link to OpenEMR's patient left-nav. The link
-# opens the new Next.js dashboard for the patient currently in context.
+# OpenEMR-side changes required for embedded Next.js dashboard tabs.
+# This reflects the finalized behavior:
+#   - "New Dashboard" patient menu item opens a tab (`ndb`) via navigateTab()
+#   - URL points to /launch with SMART launch params + embedded returnTo path
+#   - cross-origin tab title fallback labels the tab "New Dashboard" (not Unknown)
 #
-# The dashboard is keyed off the FHIR Patient.id (a uuid). PHP carries
-# the internal pid in session, so this snippet looks up the matching
-# uuid in patient_data and sends *that* in the link. Doing the lookup
-# here means the Next dashboard does not need OpenEMR's Standard API
-# (`api:oemr` scope) just to resolve pid → uuid — FHIR scopes are
-# enough.
-#
-# This is a SNIPPET + APPLY GUIDE rather than a strict unified diff
-# because OpenEMR's left-nav template drifts between versions and themes.
-# See openemr-patches/README.md for context.
+# NOTE: This is still a snippet/apply guide (not strict git-apply) because
+# OpenEMR drifts by release. Apply to equivalent code blocks if line numbers differ.
 
 # ─────────────────────────────────────────────────────────────────────
-# 1. WHERE TO PUT IT
+# 1) src/Menu/PatientMenuRole.php
 # ─────────────────────────────────────────────────────────────────────
 #
-# Target file: interface/main/left_nav.php (8.1.x — older builds may
-# use interface/themes/<theme>/left_nav.html.twig, in which case adapt
-# to Twig syntax).
+# A) Add imports near the top:
 #
-# Insertion point: inside the patient-context block — i.e. the section
-# that's only rendered when $_SESSION['pid'] is populated, near other
-# patient-scoped links like "Demographics", "Issues", "History". Search
-# left_nav.php for `set_pid` or `pid=' . attr_url($pid)` to find the
-# block.
+#   use OpenEMR\Common\Uuid\UuidRegistry;
+#   use OpenEMR\FHIR\Config\ServerConfig;
+#   use OpenEMR\FHIR\SMART\SMARTLaunchToken;
+#
+# B) Replace `applyNewDashboardUrl()` with logic equivalent to this:
+
+--- a/src/Menu/PatientMenuRole.php
++++ b/src/Menu/PatientMenuRole.php
+@@
+ private function applyNewDashboardUrl(object $menu_obj): void
+ {
+     if (($menu_obj->menu_id ?? null) !== 'new_dashboard') {
+         return;
+     }
+     $menu_obj->on_click = "top.restoreSession(); if (typeof top.navigateTab === 'function') { top.navigateTab(this.href, 'ndb', function () { if (typeof top.activateTabByName === 'function') { top.activateTabByName('ndb', true); } }, 'New Dashboard'); return false; } top.location.href=this.href; return false;";
+     $configured = OEGlobalsBag::getInstance()->get('new_dashboard_url');
+     $hasOverride = is_string($configured) && $configured !== '';
+     $base = $hasOverride ? rtrim($configured, '/') : 'http://localhost:3000';
+
+     $sessionPid = SessionWrapperFactory::getInstance()->getActiveSession()->get('pid');
+     if (is_numeric($sessionPid) && (int) $sessionPid > 0) {
+         $row = sqlQuery(
+             "SELECT uuid FROM patient_data WHERE pid = ?",
+             [(int) $sessionPid]
+         );
+         $uuidBytes = is_array($row) ? ($row['uuid'] ?? null) : null;
+         if (is_string($uuidBytes) && $uuidBytes !== '') {
+             $patientUuid = UuidRegistry::uuidToString($uuidBytes);
+             $patientPath = '/embed/patient/' . urlencode($patientUuid);
+             $launchToken = new SMARTLaunchToken($patientUuid);
+             $launchToken->setIntent(SMARTLaunchToken::INTENT_MAIN_TAB);
+             $issuer = (new ServerConfig())->getFhirUrl();
+             $menu_obj->url = $base . '/launch'
+                 . '?patient=' . urlencode($patientUuid)
+                 . '&returnTo=' . urlencode($patientPath)
+                 . '&launch=' . urlencode((string) $launchToken->serialize())
+                 . '&iss=' . urlencode($issuer)
+                 . '&aud=' . urlencode($issuer);
+             $menu_obj->pid = 'false';
+             return;
+         }
+     }
+
+     if ($hasOverride) {
+         $menu_obj->url = $base . '/launch';
+         $menu_obj->pid = 'false';
+     }
+ }
 
 # ─────────────────────────────────────────────────────────────────────
-# 2. SNIPPET TO ADD
+# 2) interface/main/tabs/js/custom_bindings.js
 # ─────────────────────────────────────────────────────────────────────
+#
+# In the cross-origin iframe fallback block (where title currently becomes
+# "Unknown"), add a dashboard-specific fallback title:
 
---- a/interface/main/left_nav.php
-+++ b/interface/main/left_nav.php
-@@ -<line number of nearest patient-scoped <li>>,7 +<line number>,28 @@
-   <!-- existing patient-scoped left-nav items: Demographics, Issues, etc. -->
-   <li><a href="...existing link..." target="...">Existing Item</a></li>
+--- a/interface/main/tabs/js/custom_bindings.js
++++ b/interface/main/tabs/js/custom_bindings.js
+@@
+                 } else {
+                     // need to cancel the loading if we are on another domain
+                     // setting the title will hide the spinner and remove the Loading... text
+                     const currentUrl = tabData.url?.() ?? '';
+                     const tabName = typeof tabData.name === 'function' ? tabData.name() : '';
 
-+  <?php
-+  // ─── New Next.js Dashboard bridge link ────────────────────────────
-+  // Opens the modern dashboard for the current patient in the same tab.
-+  // Configure the target via Administration → Globals → System →
-+  // "new_dashboard_url" (defaults to http://localhost:3000 for dev).
-+  //
-+  // Dashboard URLs are keyed by FHIR Patient.id (uuid), so we resolve
-+  // the session's internal pid → uuid here and send the uuid. This
-+  // avoids needing the api:oemr scope on the OAuth client.
-+  $newDashboardUrl = $GLOBALS['new_dashboard_url'] ?? 'http://localhost:3000';
-+  $bridgePid = $_SESSION['pid'] ?? null;
-+  if (!empty($bridgePid)) {
-+      $row = sqlQuery(
-+          "SELECT uuid FROM patient_data WHERE pid = ?",
-+          [(int) $bridgePid]
-+      );
-+      $bridgeUuidRaw = $row['uuid'] ?? null;
-+      if (!empty($bridgeUuidRaw)) {
-+          $bridgeUuid = \OpenEMR\Common\Uuid\UuidRegistry::uuidToString($bridgeUuidRaw);
-+          $bridgeHref = rtrim($newDashboardUrl, '/')
-+              . '/patient/'
-+              . urlencode($bridgeUuid);
-+          echo '<li><a href="' . attr($bridgeHref) . '" target="_self" '
-+              . 'class="new-dashboard-bridge">New Dashboard</a></li>';
-+      }
-+  }
-+  ?>
-+
-   <!-- continue with existing patient-scoped left-nav items -->
+                     // eRx pages navigate to an external domain (NewCrop), so the iframe document is unreadable
+                     const erxMarkers = ['/interface/eRx.php', 'newcrop'];
+                     const isErxPage = currentUrl && erxMarkers.some(marker => currentUrl.includes(marker));
+                     const dashboardMarkers = ['/launch', '/embed/patient/', 'localhost:3000'];
+                     const isNewDashboardTab = tabName === 'ndb' || (currentUrl && dashboardMarkers.some(marker => currentUrl.includes(marker)));
+
+                     tabData.title(xl(isErxPage ? 'Ensora eRx' : (isNewDashboardTab ? 'New Dashboard' : 'Unknown')));
+                 }
 
 # ─────────────────────────────────────────────────────────────────────
-# 3. NOTES
+# 3) ACCEPTANCE CHECKLIST
 # ─────────────────────────────────────────────────────────────────────
 #
-# - `sqlQuery()` is OpenEMR's standard parameterised-query helper
-#   (defined in library/sql.inc.php, autoloaded throughout the PHP UI).
-#
-# - `\OpenEMR\Common\Uuid\UuidRegistry::uuidToString()` converts the
-#   binary(16) uuid stored in patient_data.uuid to canonical
-#   8-4-4-4-12 hex form. The class is autoloaded via composer; the
-#   fully-qualified name avoids needing a `use` statement.
-#
-# - `attr()` is OpenEMR's HTML-attribute escaper (defined in
-#   library/htmlspecialchars.inc.php). If you're somehow on a build
-#   where that helper isn't available, fall back to
-#   `htmlspecialchars($bridgeHref, ENT_QUOTES, 'UTF-8')`.
-#
-# - target="_self" intentional — clinicians should navigate, not get a
-#   new tab they have to manage.
-#
-# - If your OpenEMR theme uses Twig instead of inline PHP, do the same
-#   uuid lookup in the controller that renders the nav and pass the
-#   resolved uuid into the template, then:
-#
-#       {% if patient_uuid %}
-#         {% set _bridge_href = (globals.new_dashboard_url|default('http://localhost:3000'))
-#               ~ '/patient/' ~ (patient_uuid|url_encode) %}
-#         <li><a href="{{ _bridge_href }}" target="_self"
-#                class="new-dashboard-bridge">New Dashboard</a></li>
-#       {% endif %}
-
-# ─────────────────────────────────────────────────────────────────────
-# 4. ACCEPTANCE
-# ─────────────────────────────────────────────────────────────────────
-#
-# - Open OpenEMR's PHP UI, pick a patient (so $_SESSION['pid'] is set).
-# - The patient left-nav now has a "New Dashboard" item.
-# - Hovering the link, the href ends in /patient/<uuid> (8-4-4-4-12 hex,
-#   not the numeric pid). If you still see /patient/<digits>, the
-#   uuid lookup didn't run — re-check the snippet placement.
-# - Clicking it navigates to <new_dashboard_url>/patient/<uuid> in the
-#   same tab and renders the dashboard for that patient.
+# - In OpenEMR patient menu, click "New Dashboard".
+# - A tab named "New Dashboard" opens (not "Unknown").
+# - Network/logs show launch URL includes:
+#     /launch?patient=<uuid>&returnTo=/embed/patient/<uuid>&launch=...&iss=...&aud=...
+# - User lands in embedded dashboard route after auth:
+#     /embed/patient/<uuid>
