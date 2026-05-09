@@ -60,6 +60,7 @@ const insecureAgent = new Agent({ connect: { rejectUnauthorized: false } });
 const SCOPES = [
   "openid",
   "fhirUser",
+  "launch",
   "offline_access",
   "user/Patient.read",
   "user/AllergyIntolerance.read",
@@ -76,6 +77,7 @@ const body = {
   token_endpoint_auth_method: "client_secret_post",
   contacts: ["dev@example.com"],
   scope: SCOPES.join(" "),
+  skip_ehr_launch_authorization_flow: true,
   initiate_login_uri: `${appUrl}/login`,
   post_logout_redirect_uris: [`${appUrl}/`],
   jwks_uri: undefined as string | undefined,

@@ -3,6 +3,7 @@ import { EncountersList } from "@/components/EncountersList";
 import { getSession } from "@/lib/auth/session";
 import { bundleEntries } from "@/lib/fhir/extract";
 import { getEncounters } from "@/lib/fhir/queries";
+import { resolvePatientId } from "@/lib/openemr/resolvePatientId";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,7 +17,8 @@ export default async function EncountersPage({
 }) {
   const { id } = await params;
   const session = await getSession();
-  const bundle = await getEncounters(session, id, 20);
+  const uuid = await resolvePatientId(session, id);
+  const bundle = await getEncounters(session, uuid, 20);
   const encs = bundleEntries<fhir4.Encounter>(bundle, "Encounter");
 
   return (

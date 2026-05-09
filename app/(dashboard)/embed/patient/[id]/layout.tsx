@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 
 type Params = Promise<{ id: string }>;
 
-export default async function PatientLayout({
+export default async function EmbeddedPatientLayout({
   children,
   params,
 }: {

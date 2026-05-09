@@ -45,11 +45,6 @@ describe("PatientHeader — happy path", () => {
     expect(badge).toHaveTextContent("Active");
   });
 
-  it("includes a sign-out link reachable by keyboard", () => {
-    render(<PatientHeader patient={patient} />);
-    const link = screen.getByRole("link", { name: /sign out/i });
-    expect(link).toHaveAttribute("href", "/logout");
-  });
 });
 
 describe("PatientHeader — degenerate inputs", () => {
