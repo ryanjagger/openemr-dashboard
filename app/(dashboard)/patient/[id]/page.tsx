@@ -5,6 +5,8 @@ import { MedicationsCard } from "@/components/cards/MedicationsCard";
 import { PrescriptionsCard } from "@/components/cards/PrescriptionsCard";
 import { ProblemsCard } from "@/components/cards/ProblemsCard";
 import { EncountersPreview } from "@/components/EncountersPreview";
+import { getSession } from "@/lib/auth/session";
+import { resolvePatientId } from "@/lib/openemr/resolvePatientId";
 
 export const runtime = "nodejs";
 
@@ -16,33 +18,35 @@ export default async function PatientDashboardPage({
   params: Params;
 }) {
   const { id } = await params;
+  const session = await getSession();
+  const uuid = await resolvePatientId(session, id);
   return (
     <div
       className="grid gap-4 md:grid-cols-2"
       aria-label="Clinical cards"
     >
       <CardShell title="Allergies">
-        <AllergiesCard patientId={id} />
+        <AllergiesCard patientId={uuid} />
       </CardShell>
 
       <CardShell title="Problem List">
-        <ProblemsCard patientId={id} />
+        <ProblemsCard patientId={uuid} />
       </CardShell>
 
       <CardShell title="Medications">
-        <MedicationsCard patientId={id} />
+        <MedicationsCard patientId={uuid} />
       </CardShell>
 
       <CardShell title="Prescriptions">
-        <PrescriptionsCard patientId={id} />
+        <PrescriptionsCard patientId={uuid} />
       </CardShell>
 
       <CardShell title="Care Team">
-        <CareTeamCard patientId={id} />
+        <CareTeamCard patientId={uuid} />
       </CardShell>
 
       <CardShell title="Recent Encounters">
-        <EncountersPreview patientId={id} />
+        <EncountersPreview patientId={uuid} />
       </CardShell>
     </div>
   );

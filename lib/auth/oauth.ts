@@ -11,6 +11,7 @@ export const SCOPES = [
   "openid",
   "fhirUser",
   "offline_access",
+  "api:oemr",
   "user/Patient.read",
   "user/AllergyIntolerance.read",
   "user/Condition.read",

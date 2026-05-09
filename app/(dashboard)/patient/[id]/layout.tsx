@@ -6,6 +6,10 @@ import {
   FhirNotFoundError,
 } from "@/lib/fhir/client";
 import { getPatient } from "@/lib/fhir/queries";
+import {
+  PatientIdLookupError,
+  resolvePatientId,
+} from "@/lib/openemr/resolvePatientId";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,9 +27,17 @@ export default async function PatientLayout({
   const session = await getSession();
   if (!session.accessToken) throw new AuthExpiredError();
 
+  let uuid: string;
+  try {
+    uuid = await resolvePatientId(session, id);
+  } catch (err) {
+    if (err instanceof PatientIdLookupError) notFound();
+    throw err;
+  }
+
   let patient: fhir4.Patient;
   try {
-    patient = await getPatient(session, id);
+    patient = await getPatient(session, uuid);
   } catch (err) {
     if (err instanceof FhirNotFoundError) notFound();
     throw err;
