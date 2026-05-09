@@ -11,7 +11,6 @@ export const SCOPES = [
   "openid",
   "fhirUser",
   "offline_access",
-  "api:oemr",
   "user/Patient.read",
   "user/AllergyIntolerance.read",
   "user/Condition.read",
@@ -38,6 +37,7 @@ export async function buildAuthorizeUrl(opts: {
   codeChallenge: string;
   nonce?: string;
   scope?: string;
+  authorizeParams?: Record<string, string>;
 }): Promise<string> {
   const as = await getAuthorizationServer();
   if (!as.authorization_endpoint) {
@@ -55,6 +55,13 @@ export async function buildAuthorizeUrl(opts: {
   url.searchParams.set("code_challenge_method", "S256");
   url.searchParams.set("state", opts.state);
   if (opts.nonce) url.searchParams.set("nonce", opts.nonce);
+  if (opts.authorizeParams) {
+    for (const [key, value] of Object.entries(opts.authorizeParams)) {
+      if (value !== "") {
+        url.searchParams.set(key, value);
+      }
+    }
+  }
   return url.href;
 }
 

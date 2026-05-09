@@ -1,26 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { exchangeCodeForTokens, getIdTokenClaims } from "@/lib/auth/oauth";
+import { isSafeReturnTo } from "@/lib/auth/post-login";
 import { getSession } from "@/lib/auth/session";
-import { publicEnv, serverEnv } from "@/lib/env";
-import { fhirGet } from "@/lib/fhir/client";
-import { BundleSchema } from "@/lib/fhir/schemas";
+import { publicEnv } from "@/lib/env";
 import { log } from "@/lib/log";
-
-async function discoverFirstPatientId(
-  session: Awaited<ReturnType<typeof getSession>>,
-): Promise<string | undefined> {
-  try {
-    const bundle = await fhirGet<fhir4.Bundle>(session, "/Patient", {
-      searchParams: { _count: "1" },
-      schema: BundleSchema as never,
-    });
-    const id = bundle.entry?.[0]?.resource?.id;
-    return typeof id === "string" && id.length > 0 ? id : undefined;
-  } catch (err) {
-    log.warn({ err }, "auth.callback.patient_discover_failed");
-    return undefined;
-  }
-}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -80,19 +63,17 @@ export async function GET(req: NextRequest) {
   await session.save();
 
   log.info(
-    { userId: session.userId, fhirUser: session.fhirUser },
+    {
+      userId: session.userId,
+      fhirUser: session.fhirUser,
+      grantedScope: result.scope,
+    },
     "auth.callback.ok",
   );
 
-  const env = serverEnv();
-  let dest: string;
-  if (returnTo) {
-    dest = returnTo;
-  } else if (env.TEST_PATIENT_ID) {
-    dest = `/patient/${env.TEST_PATIENT_ID}`;
-  } else {
-    const discovered = await discoverFirstPatientId(session);
-    dest = discovered ? `/patient/${discovered}` : "/patient/placeholder";
-  }
-  return NextResponse.redirect(new URL(dest, publicBase));
+  // Stay inside the Next app after OAuth. Redirecting to OpenEMR's PHP
+  // main.php here can trigger a second PHP-form login, depending on how
+  // the OpenEMR build separates OAuth-provider and UI sessions.
+  const destination = isSafeReturnTo(returnTo) ? returnTo : "/";
+  return NextResponse.redirect(new URL(destination, publicBase));
 }

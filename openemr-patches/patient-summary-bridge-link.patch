@@ -1,9 +1,14 @@
 # patient-summary-bridge-link.patch
 #
 # Adds a "New Dashboard" link to OpenEMR's patient left-nav. The link
-# opens the new Next.js dashboard for the patient currently in context
-# (uses pid because that's what OpenEMR's PHP UI carries in session;
-# the dashboard resolves pid → FHIR Patient.id server-side).
+# opens the new Next.js dashboard for the patient currently in context.
+#
+# The dashboard is keyed off the FHIR Patient.id (a uuid). PHP carries
+# the internal pid in session, so this snippet looks up the matching
+# uuid in patient_data and sends *that* in the link. Doing the lookup
+# here means the Next dashboard does not need OpenEMR's Standard API
+# (`api:oemr` scope) just to resolve pid → uuid — FHIR scopes are
+# enough.
 #
 # This is a SNIPPET + APPLY GUIDE rather than a strict unified diff
 # because OpenEMR's left-nav template drifts between versions and themes.
@@ -29,7 +34,7 @@
 
 --- a/interface/main/left_nav.php
 +++ b/interface/main/left_nav.php
-@@ -<line number of nearest patient-scoped <li>>,7 +<line number>,18 @@
+@@ -<line number of nearest patient-scoped <li>>,7 +<line number>,28 @@
    <!-- existing patient-scoped left-nav items: Demographics, Issues, etc. -->
    <li><a href="...existing link..." target="...">Existing Item</a></li>
 
@@ -38,14 +43,26 @@
 +  // Opens the modern dashboard for the current patient in the same tab.
 +  // Configure the target via Administration → Globals → System →
 +  // "new_dashboard_url" (defaults to http://localhost:3000 for dev).
++  //
++  // Dashboard URLs are keyed by FHIR Patient.id (uuid), so we resolve
++  // the session's internal pid → uuid here and send the uuid. This
++  // avoids needing the api:oemr scope on the OAuth client.
 +  $newDashboardUrl = $GLOBALS['new_dashboard_url'] ?? 'http://localhost:3000';
 +  $bridgePid = $_SESSION['pid'] ?? null;
 +  if (!empty($bridgePid)) {
-+      $bridgeHref = rtrim($newDashboardUrl, '/')
-+          . '/patient/'
-+          . urlencode((string) $bridgePid);
-+      echo '<li><a href="' . attr($bridgeHref) . '" target="_self" '
-+          . 'class="new-dashboard-bridge">New Dashboard</a></li>';
++      $row = sqlQuery(
++          "SELECT uuid FROM patient_data WHERE pid = ?",
++          [(int) $bridgePid]
++      );
++      $bridgeUuidRaw = $row['uuid'] ?? null;
++      if (!empty($bridgeUuidRaw)) {
++          $bridgeUuid = \OpenEMR\Common\Uuid\UuidRegistry::uuidToString($bridgeUuidRaw);
++          $bridgeHref = rtrim($newDashboardUrl, '/')
++              . '/patient/'
++              . urlencode($bridgeUuid);
++          echo '<li><a href="' . attr($bridgeHref) . '" target="_self" '
++              . 'class="new-dashboard-bridge">New Dashboard</a></li>';
++      }
 +  }
 +  ?>
 +
@@ -55,6 +72,14 @@
 # 3. NOTES
 # ─────────────────────────────────────────────────────────────────────
 #
+# - `sqlQuery()` is OpenEMR's standard parameterised-query helper
+#   (defined in library/sql.inc.php, autoloaded throughout the PHP UI).
+#
+# - `\OpenEMR\Common\Uuid\UuidRegistry::uuidToString()` converts the
+#   binary(16) uuid stored in patient_data.uuid to canonical
+#   8-4-4-4-12 hex form. The class is autoloaded via composer; the
+#   fully-qualified name avoids needing a `use` statement.
+#
 # - `attr()` is OpenEMR's HTML-attribute escaper (defined in
 #   library/htmlspecialchars.inc.php). If you're somehow on a build
 #   where that helper isn't available, fall back to
@@ -63,18 +88,13 @@
 # - target="_self" intentional — clinicians should navigate, not get a
 #   new tab they have to manage.
 #
-# - The dashboard accepts pid because that's what OpenEMR carries in
-#   session. Server-side, the dashboard's /patient/[id] layout resolves
-#   pid → FHIR Patient.id by Patient.identifier search before fetching
-#   the resource. (See lib/fhir/queries.ts → getPatient and the
-#   project memory note on OpenEMR 8.1.x's identifier mapping.)
+# - If your OpenEMR theme uses Twig instead of inline PHP, do the same
+#   uuid lookup in the controller that renders the nav and pass the
+#   resolved uuid into the template, then:
 #
-# - If your OpenEMR theme uses Twig instead of inline PHP, the
-#   equivalent template snippet is roughly:
-#
-#       {% if app.session.get('pid') %}
+#       {% if patient_uuid %}
 #         {% set _bridge_href = (globals.new_dashboard_url|default('http://localhost:3000'))
-#               ~ '/patient/' ~ (app.session.get('pid')|url_encode) %}
+#               ~ '/patient/' ~ (patient_uuid|url_encode) %}
 #         <li><a href="{{ _bridge_href }}" target="_self"
 #                class="new-dashboard-bridge">New Dashboard</a></li>
 #       {% endif %}
@@ -85,6 +105,8 @@
 #
 # - Open OpenEMR's PHP UI, pick a patient (so $_SESSION['pid'] is set).
 # - The patient left-nav now has a "New Dashboard" item.
-# - Clicking it navigates to <new_dashboard_url>/patient/<pid> in the
-#   same tab. With shared SSO, the new dashboard renders without a
-#   second login prompt.
+# - Hovering the link, the href ends in /patient/<uuid> (8-4-4-4-12 hex,
+#   not the numeric pid). If you still see /patient/<digits>, the
+#   uuid lookup didn't run — re-check the snippet placement.
+# - Clicking it navigates to <new_dashboard_url>/patient/<uuid> in the
+#   same tab and renders the dashboard for that patient.

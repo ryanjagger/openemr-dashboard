@@ -36,7 +36,11 @@ function FieldRow({
   );
 }
 
-export function PatientHeader({ patient }: { patient: fhir4.Patient }) {
+export function PatientHeader({
+  patient,
+}: {
+  patient: fhir4.Patient;
+}) {
   const name = formatPatientName(patient);
   const mrn = extractMRN(patient);
   const pubpid = extractPubPid(patient);
@@ -74,12 +78,6 @@ export function PatientHeader({ patient }: { patient: fhir4.Patient }) {
               {isActive ? "Active" : "Inactive"}
             </Badge>
           </div>
-          <a
-            href="/logout"
-            className="text-muted-foreground text-sm underline-offset-4 hover:text-foreground hover:underline focus-visible:underline focus-visible:outline-none"
-          >
-            Sign out
-          </a>
         </div>
 
         <Separator className="my-3" />

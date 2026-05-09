@@ -35,16 +35,28 @@ type CookieData = {
 
 let cachedOpts: SessionOptions | null = null;
 
+function shouldUseCrossSiteSessionCookie(env: ReturnType<typeof serverEnv>): boolean {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (!appUrl) return false;
+  try {
+    return new URL(appUrl).origin !== new URL(env.OPENEMR_BASE_URL).origin;
+  } catch {
+    return false;
+  }
+}
+
 function getSessionOptions(): SessionOptions {
   if (cachedOpts) return cachedOpts;
   const env = serverEnv();
+  const crossSiteEmbed = shouldUseCrossSiteSessionCookie(env);
   cachedOpts = {
     password: env.SESSION_SECRET,
     cookieName: "openemr_dashboard_session",
     cookieOptions: {
       httpOnly: true,
-      secure: env.NODE_ENV === "production",
-      sameSite: "lax",
+      // Embedded OpenEMR tab mode (different origin) requires third-party cookie semantics.
+      secure: crossSiteEmbed || env.NODE_ENV === "production",
+      sameSite: crossSiteEmbed ? "none" : "lax",
       path: "/",
     },
     ttl: 60 * 60 * 8,

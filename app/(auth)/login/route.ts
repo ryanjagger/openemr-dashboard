@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { buildAuthorizeUrl } from "@/lib/auth/oauth";
+import { buildAuthorizeUrl, SCOPES } from "@/lib/auth/oauth";
+import { resolveLoginReturnTo } from "@/lib/auth/post-login";
 import {
   generateChallenge,
   generateNonce,
@@ -14,6 +15,10 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
+  const searchParams = req.nextUrl.searchParams;
+  const launch = searchParams.get("launch");
+  const iss = searchParams.get("iss") ?? "";
+  const aud = searchParams.get("aud") ?? "";
 
   const verifier = await generateVerifier();
   const challenge = await generateChallenge(verifier);
@@ -23,15 +28,34 @@ export async function GET(req: NextRequest) {
   session.codeVerifier = verifier;
   session.state = state;
   session.nonce = nonce;
-  const returnTo = req.nextUrl.searchParams.get("returnTo");
-  if (returnTo && returnTo.startsWith("/")) session.returnTo = returnTo;
+  session.returnTo = resolveLoginReturnTo(
+    req.nextUrl.searchParams.get("returnTo"),
+  );
   await session.save();
+
+  const effectiveScope = launch ? `${SCOPES} launch` : undefined;
+  const authorizeParams = {
+    launch: launch ?? "",
+    iss,
+    aud,
+    autosubmit: launch ? "1" : "",
+  };
 
   const url = await buildAuthorizeUrl({
     state,
     codeChallenge: challenge,
     nonce,
+    scope: effectiveScope,
+    authorizeParams,
   });
-  log.debug({ returnTo: session.returnTo }, "auth.login.redirect");
+  log.debug(
+    {
+      returnTo: session.returnTo,
+      launchFlow: Boolean(launch),
+      authorizeScope: effectiveScope ?? SCOPES,
+      authorizeParams,
+    },
+    "auth.login.redirect",
+  );
   return NextResponse.redirect(url);
 }

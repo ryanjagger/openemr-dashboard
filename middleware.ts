@@ -9,13 +9,14 @@ export const runtime = "nodejs";
 // Paths owned by the Next.js app — never proxied.
 const APP_ROUTES = new Set([
   "/",
+  "/launch",
   "/login",
   "/callback",
   "/logout",
   "/favicon.ico",
 ]);
 
-const APP_PREFIXES = ["/api/", "/patient/"];
+const APP_PREFIXES = ["/api/", "/patient/", "/embed/"];
 
 function isAppOwned(pathname: string): boolean {
   if (APP_ROUTES.has(pathname)) return true;
@@ -42,6 +43,7 @@ export async function middleware(req: NextRequest) {
 
   // Authed app routes (the dashboard).
   if (pathname.startsWith("/patient/")) return gateOrPass(req);
+  if (pathname.startsWith("/embed/patient/")) return gateOrPass(req);
 
   // Other app-owned routes pass through to Next.js.
   if (isAppOwned(pathname)) return NextResponse.next();
