@@ -254,16 +254,16 @@ Single entry point for every FHIR call. Behavior:
 
 ### `lib/fhir/queries.ts` — typed query functions per resource
 
-| Function | FHIR query | Notes |
-|---|---|---|
-| `getPatient(s, id)` | `GET /Patient/{id}` | |
-| `getAllergies(s, pid)` | `GET /AllergyIntolerance?patient={pid}` | |
-| `getProblems(s, pid)` | `GET /Condition?patient={pid}&category=problem-list-item` | OpenEMR 8.1.x doesn't list `category` as a searchParam in its CapabilityStatement; we send it anyway and **also** filter client-side as a safety net. |
-| `getMedications(s, pid)` | `GET /MedicationRequest?patient={pid}&intent=plan&status=active` | OpenEMR 8.1.x doesn't expose `MedicationStatement`, so the medication list is filtered `MedicationRequest`. |
-| `getPrescriptions(s, pid)` | `GET /MedicationRequest?patient={pid}&intent=order` | |
-| `getCareTeam(s, pid)` | `GET /CareTeam?patient={pid}&status=active` | |
-| `getEncounters(s, pid, n)` | `GET /Encounter?patient={pid}&_sort=-date&_count=n` | |
-| `getLabObservations(s, pid, n)` | `GET /Observation?patient={pid}&category=laboratory&_sort=-date&_count=n` | |
+| Function                        | FHIR query                                                                | Notes                                                                                                                                                 |
+| ------------------------------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `getPatient(s, id)`             | `GET /Patient/{id}`                                                       |                                                                                                                                                       |
+| `getAllergies(s, pid)`          | `GET /AllergyIntolerance?patient={pid}`                                   |                                                                                                                                                       |
+| `getProblems(s, pid)`           | `GET /Condition?patient={pid}&category=problem-list-item`                 | OpenEMR 8.1.x doesn't list `category` as a searchParam in its CapabilityStatement; we send it anyway and **also** filter client-side as a safety net. |
+| `getMedications(s, pid)`        | `GET /MedicationRequest?patient={pid}&intent=plan&status=active`          | OpenEMR 8.1.x doesn't expose `MedicationStatement`, so the medication list is filtered `MedicationRequest`.                                           |
+| `getPrescriptions(s, pid)`      | `GET /MedicationRequest?patient={pid}&intent=order`                       |                                                                                                                                                       |
+| `getCareTeam(s, pid)`           | `GET /CareTeam?patient={pid}&status=active`                               |                                                                                                                                                       |
+| `getEncounters(s, pid, n)`      | `GET /Encounter?patient={pid}&_sort=-date&_count=n`                       |                                                                                                                                                       |
+| `getLabObservations(s, pid, n)` | `GET /Observation?patient={pid}&category=laboratory&_sort=-date&_count=n` |                                                                                                                                                       |
 
 `lib/fhir/extract.ts` holds pure helpers (`formatPatientName`,
 `formatCodeableConcept`, `bundleEntries`, etc.) that never touch IO.
@@ -442,14 +442,14 @@ openemr-patches/
 
 ## 11. Known limitations & phase-2+ work
 
-| Area | Phase-1 state | Production fix |
-|---|---|---|
-| Token store | Process memory; restart = logout | Redis or equivalent shared store |
-| Reverse proxy | Next.js middleware | nginx/Caddy in front of both Next.js and Apache |
-| CSP `script-src` | `'unsafe-inline'` | Per-request nonce minted in middleware |
-| OAuth → PHP SSO | Not bidirectional | Investigate sharing the OpenEMR OAuth-provider session with the PHP UI session |
-| PHP patch | Snippet/apply guide | Upstream-friendly module, version-pinned |
-| Patient ID resolution | URL must already be a FHIR uuid | Server-side pid → uuid lookup via REST API, called from layout |
+| Area                  | Phase-1 state                    | Production fix                                                                 |
+| --------------------- | -------------------------------- | ------------------------------------------------------------------------------ |
+| Token store           | Process memory; restart = logout | Redis or equivalent shared store                                               |
+| Reverse proxy         | Next.js middleware               | nginx/Caddy in front of both Next.js and Apache                                |
+| CSP `script-src`      | `'unsafe-inline'`                | Per-request nonce minted in middleware                                         |
+| OAuth → PHP SSO       | Not bidirectional                | Investigate sharing the OpenEMR OAuth-provider session with the PHP UI session |
+| PHP patch             | Snippet/apply guide              | Upstream-friendly module, version-pinned                                       |
+| Patient ID resolution | URL must already be a FHIR uuid  | Server-side pid → uuid lookup via REST API, called from layout                 |
 
 Each of these is documented inline at the relevant code site as
 well — search for "phase-2", "phase-1 limitation", or "TODO".
