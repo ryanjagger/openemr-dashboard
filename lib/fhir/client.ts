@@ -6,8 +6,11 @@ import { openemrFetch } from "@/lib/http";
 import { audit, log } from "@/lib/log";
 
 export class AuthExpiredError extends Error {
-  constructor(message = "Access token expired and refresh failed") {
-    super(message);
+  constructor(
+    message = "Access token expired and refresh failed",
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
     this.name = "AuthExpiredError";
   }
 }
