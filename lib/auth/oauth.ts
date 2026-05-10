@@ -1,11 +1,19 @@
 import * as oauth from "oauth4webapi";
-import { requireOAuthClient, serverEnv } from "@/lib/env";
+import { publicEnv, requireOAuthClient, serverEnv } from "@/lib/env";
 import { openemrFetch } from "@/lib/http";
 import { log } from "@/lib/log";
 
 let cachedAS: oauth.AuthorizationServer | null = null;
 
-const fetchOpt = { [oauth.customFetch]: openemrFetch };
+// In dev, NEXT_PUBLIC_APP_URL is http://localhost:3000 (no TLS). oauth4webapi
+// refuses non-HTTPS issuers by default; opt out via the allowInsecureRequests
+// escape hatch only when the public URL is itself HTTP — prod stays strict.
+const allowHttp =
+  new URL(publicEnv().NEXT_PUBLIC_APP_URL).protocol === "http:";
+const fetchOpt = {
+  [oauth.customFetch]: openemrFetch,
+  ...(allowHttp ? { [oauth.allowInsecureRequests]: true } : {}),
+};
 
 export const SCOPES = [
   "openid",
@@ -17,12 +25,20 @@ export const SCOPES = [
   "user/MedicationRequest.read",
   "user/CareTeam.read",
   "user/Encounter.read",
+  "user/Observation.read",
 ].join(" ");
 
 export async function getAuthorizationServer(): Promise<oauth.AuthorizationServer> {
   if (cachedAS) return cachedAS;
   const env = serverEnv();
-  const issuer = new URL(`${env.OPENEMR_BASE_URL}/oauth2/${env.OPENEMR_SITE}`);
+  // The OAuth issuer must match what OpenEMR advertises in its OIDC metadata,
+  // which is derived from OpenEMR's `site_addr_oath` global. In the
+  // shared-hostname strangler-fig deployment, that's set to the dashboard
+  // hostname (NEXT_PUBLIC_APP_URL) so browser-facing OAuth navigations stay
+  // same-site. The actual fetch is rewritten to OPENEMR_BASE_URL inside
+  // openemrFetch (lib/http.ts) to avoid loop-fetching the dashboard server.
+  const issuerBase = publicEnv().NEXT_PUBLIC_APP_URL;
+  const issuer = new URL(`${issuerBase}/oauth2/${env.OPENEMR_SITE}`);
   log.debug({ issuer: issuer.href }, "oidc.discovery");
   const response = await oauth.discoveryRequest(issuer, {
     algorithm: "oidc",

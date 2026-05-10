@@ -25,9 +25,14 @@ function securityHeadersFor(opts: {
 }) {
   // CSP is strict by default. The embed route allows same-origin framing so
   // OpenEMR's tab shell can host the dashboard in an iframe.
+  // `script-src` includes 'unsafe-inline' because Next.js's RSC streaming /
+  // hydration writes inline <script> blocks whose content-hash changes each
+  // build, so a hash-pinned CSP is impractical. Phase 6+ should swap this
+  // for a nonce-based CSP (generate a per-request nonce in middleware, hand
+  // it to Next.js, drop 'unsafe-inline').
   const csp = [
     "default-src 'self'",
-    `script-src 'self'${isDev ? " 'unsafe-eval' 'unsafe-inline'" : ""}`,
+    `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
     `style-src 'self' 'unsafe-inline'`,
     "img-src 'self' data: blob:",
     "font-src 'self' data:",

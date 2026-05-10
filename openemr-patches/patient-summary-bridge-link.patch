@@ -65,7 +65,32 @@
  }
 
 # ─────────────────────────────────────────────────────────────────────
-# 2) interface/main/tabs/js/custom_bindings.js
+# 2) library/globals.inc.php — declare `new_dashboard_url` global
+# ─────────────────────────────────────────────────────────────────────
+#
+# Without this declaration the global is read by PatientMenuRole but
+# never appears in Administration → Globals → Connectors. Sites that
+# don't set the value fall back to `http://localhost:3000`, which causes
+# cross-environment audience mismatches when production OpenEMR's menu
+# stamps a prod `aud` but the link routes to a local dashboard.
+
+--- a/library/globals.inc.php
++++ b/library/globals.inc.php
+@@ -3267,6 +3267,13 @@
+             xl('The hostname for OAuth2, FHIR, CCDA, and Payment Processing, pointing back back to this OpenEMR instance. e.g. https://localhost:9300.')
+         ],
+
++        'new_dashboard_url' => [
++            xl('New Dashboard URL'),
++            'text',
++            'http://localhost:3000',
++            xl('Origin of the companion Next.js dashboard used by the New Dashboard menu bridge. Must point to the dashboard whose OAuth2 client is registered against this OpenEMR. e.g. https://dashboard.example.com')
++        ],
++
+         GlobalConnectorsEnum::REST_FHIR_API->value => [
+
+# ─────────────────────────────────────────────────────────────────────
+# 3) interface/main/tabs/js/custom_bindings.js
 # ─────────────────────────────────────────────────────────────────────
 #
 # In the cross-origin iframe fallback block (where title currently becomes
@@ -90,7 +115,7 @@
                  }
 
 # ─────────────────────────────────────────────────────────────────────
-# 3) ACCEPTANCE CHECKLIST
+# 4) ACCEPTANCE CHECKLIST
 # ─────────────────────────────────────────────────────────────────────
 #
 # - In OpenEMR patient menu, click "New Dashboard".

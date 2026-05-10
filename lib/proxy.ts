@@ -59,10 +59,16 @@ function rewriteLocation(loc: string, req: NextRequest, upstream: URL): string {
     // Absolute URL?
     parsed = new URL(loc);
   } catch {
-    // Relative — resolve against our public origin so the browser stays on
-    // the proxy. Next.js's Response constructor rejects relative Location
-    // headers, so we must hand it an absolute URL.
-    return new URL(loc, ourOrigin).toString();
+    // Relative — resolve against the *original request URL* (so a Location
+    // like `calendar/index.php` from `/interface/main/main_info.php` ends
+    // up at `/interface/main/calendar/index.php`, not `/calendar/...`).
+    // Next.js's Response constructor rejects relative Location headers,
+    // so we must hand it an absolute URL.
+    const requestUrl = new URL(
+      req.nextUrl.pathname + req.nextUrl.search,
+      ourOrigin,
+    );
+    return new URL(loc, requestUrl).toString();
   }
   // Absolute pointing at OpenEMR — rewrite to our origin so the browser stays
   // on the proxy.
