@@ -1,6 +1,7 @@
 import { AllergiesCard } from "@/components/cards/AllergiesCard";
 import { CardShell } from "@/components/cards/CardShell";
 import { CareTeamCard } from "@/components/cards/CareTeamCard";
+import { LabsCard } from "@/components/cards/LabsCard";
 import { MedicationsCard } from "@/components/cards/MedicationsCard";
 import { PrescriptionsCard } from "@/components/cards/PrescriptionsCard";
 import { ProblemsCard } from "@/components/cards/ProblemsCard";
@@ -43,6 +44,10 @@ export default async function PatientDashboardPage({
 
       <CardShell title="Care Team">
         <CareTeamCard patientId={uuid} />
+      </CardShell>
+
+      <CardShell title="Labs">
+        <LabsCard patientId={uuid} />
       </CardShell>
 
       <CardShell title="Recent Encounters">

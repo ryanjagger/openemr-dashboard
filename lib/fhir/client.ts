@@ -100,7 +100,12 @@ export async function fhirGet<T = unknown>(
     try {
       await forceRefresh(session);
     } catch (err) {
-      if (err instanceof RefreshFailedError) throw new AuthExpiredError();
+      if (err instanceof RefreshFailedError) {
+        throw new AuthExpiredError(
+          "Access token expired and refresh failed",
+          { cause: err },
+        );
+      }
       throw err;
     }
     try {

@@ -111,3 +111,53 @@ export function conditionCategoryCodes(
     .map((c) => c.code)
     .filter((c): c is string => typeof c === "string");
 }
+
+/**
+ * Render an Observation.value into a single string for display.
+ * Order of preference: Quantity (value + unit), CodeableConcept, string.
+ * Returns "" when the resource carries no representable value.
+ */
+export function formatObservationValue(
+  observation: fhir4.Observation,
+): string {
+  const q = observation.valueQuantity;
+  if (q?.value !== undefined) {
+    const unit = q.unit ?? q.code ?? "";
+    return unit ? `${q.value} ${unit}` : String(q.value);
+  }
+  if (observation.valueCodeableConcept) {
+    return formatCodeableConcept(observation.valueCodeableConcept);
+  }
+  if (typeof observation.valueString === "string") {
+    return observation.valueString;
+  }
+  return "";
+}
+
+/**
+ * HL7 v3 ObservationInterpretation flag — H/L/A (high/low/abnormal),
+ * HH/LL (critical), N (normal). We surface non-normal as a Badge.
+ * Returns the first matching code or null.
+ */
+export function observationInterpretationCode(
+  observation: fhir4.Observation,
+): string | null {
+  const code = (observation.interpretation ?? [])
+    .flatMap((cc) => cc.coding ?? [])
+    .map((c) => c.code)
+    .find((c): c is string => typeof c === "string");
+  return code ?? null;
+}
+
+/**
+ * Render Observation.effective[x] | Observation.issued as YYYY-MM-DD,
+ * preferring effectiveDateTime, then effectivePeriod.start, then issued.
+ */
+export function observationDate(observation: fhir4.Observation): string {
+  const raw =
+    observation.effectiveDateTime ??
+    observation.effectivePeriod?.start ??
+    observation.issued ??
+    "";
+  return raw.slice(0, 10);
+}

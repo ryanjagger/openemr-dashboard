@@ -8,6 +8,7 @@ import {
   ConditionSchema,
   EncounterSchema,
   MedicationRequestSchema,
+  ObservationSchema,
   PatientSchema,
 } from "@/lib/fhir/schemas";
 
@@ -121,6 +122,28 @@ export async function getEncounters(
   });
 }
 
+/**
+ * OpenEMR's FhirObservationLaboratoryService exposes lab results as
+ * Observation with category=laboratory (LOINC-coded). Sort newest first
+ * by report date and cap at `count` so the dashboard card stays cheap.
+ */
+export async function getLabObservations(
+  session: Session,
+  patientId: string,
+  count = 50,
+): Promise<fhir4.Bundle> {
+  return fhirGet<fhir4.Bundle>(session, "/Observation", {
+    searchParams: {
+      patient: patientId,
+      category: "laboratory",
+      _sort: "-date",
+      _count: String(count),
+    },
+    schema: BundleSchema as never,
+    patientIdForAudit: patientId,
+  });
+}
+
 // Re-export schemas under their source-of-truth names so callers can
 // pass them ad-hoc without import sprawl.
 export {
@@ -130,5 +153,6 @@ export {
   ConditionSchema,
   EncounterSchema,
   MedicationRequestSchema,
+  ObservationSchema,
   PatientSchema,
 };

@@ -217,6 +217,36 @@ export const EncounterSchema = z
   })
   .passthrough();
 
+export const ObservationSchema = z
+  .object({
+    resourceType: z.literal("Observation"),
+    id: z.string().optional(),
+    status: z.string().optional(),
+    category: z.array(CodeableConcept).optional(),
+    code: CodeableConcept.optional(),
+    subject: Reference.optional(),
+    effectiveDateTime: z.string().optional(),
+    effectivePeriod: Period.optional(),
+    issued: z.string().optional(),
+    valueQuantity: Quantity.optional(),
+    valueCodeableConcept: CodeableConcept.optional(),
+    valueString: z.string().optional(),
+    interpretation: z.array(CodeableConcept).optional(),
+    referenceRange: z
+      .array(
+        z
+          .object({
+            low: Quantity.optional(),
+            high: Quantity.optional(),
+            text: z.string().optional(),
+          })
+          .passthrough(),
+      )
+      .optional(),
+    note: z.array(Annotation).optional(),
+  })
+  .passthrough();
+
 export const BundleSchema = z
   .object({
     resourceType: z.literal("Bundle"),
@@ -243,6 +273,7 @@ export const ResourceSchemas = {
   MedicationRequest: MedicationRequestSchema,
   CareTeam: CareTeamSchema,
   Encounter: EncounterSchema,
+  Observation: ObservationSchema,
   Bundle: BundleSchema,
 } as const;
 
