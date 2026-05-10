@@ -8,12 +8,19 @@ let cachedAS: oauth.AuthorizationServer | null = null;
 // In dev, NEXT_PUBLIC_APP_URL is http://localhost:3000 (no TLS). oauth4webapi
 // refuses non-HTTPS issuers by default; opt out via the allowInsecureRequests
 // escape hatch only when the public URL is itself HTTP — prod stays strict.
-const allowHttp =
-  new URL(publicEnv().NEXT_PUBLIC_APP_URL).protocol === "http:";
-const fetchOpt = {
-  [oauth.customFetch]: openemrFetch,
-  ...(allowHttp ? { [oauth.allowInsecureRequests]: true } : {}),
-};
+// Lazy so module evaluation never reads env (Next collects page data by
+// importing route modules; eager reads crash the build if a var is unset).
+let cachedFetchOpt: Record<symbol, unknown> | null = null;
+function getFetchOpt(): Record<symbol, unknown> {
+  if (cachedFetchOpt) return cachedFetchOpt;
+  const allowHttp =
+    new URL(publicEnv().NEXT_PUBLIC_APP_URL).protocol === "http:";
+  cachedFetchOpt = {
+    [oauth.customFetch]: openemrFetch,
+    ...(allowHttp ? { [oauth.allowInsecureRequests]: true } : {}),
+  };
+  return cachedFetchOpt;
+}
 
 export const SCOPES = [
   "openid",
@@ -42,7 +49,7 @@ export async function getAuthorizationServer(): Promise<oauth.AuthorizationServe
   log.debug({ issuer: issuer.href }, "oidc.discovery");
   const response = await oauth.discoveryRequest(issuer, {
     algorithm: "oidc",
-    ...fetchOpt,
+    ...getFetchOpt(),
   });
   cachedAS = await oauth.processDiscoveryResponse(issuer, response);
   return cachedAS;
@@ -113,7 +120,7 @@ export async function exchangeCodeForTokens(opts: {
     params,
     env.OAUTH_REDIRECT_URI,
     opts.codeVerifier,
-    fetchOpt,
+    getFetchOpt(),
   );
 
   return oauth.processAuthorizationCodeResponse(as, client, tokenResponse, {
@@ -133,7 +140,7 @@ export async function refreshTokens(
     client,
     clientAuth,
     refreshToken,
-    fetchOpt,
+    getFetchOpt(),
   );
 
   return oauth.processRefreshTokenResponse(as, client, tokenResponse);

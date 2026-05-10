@@ -68,6 +68,7 @@ const SCOPES = [
   "user/MedicationRequest.read",
   "user/CareTeam.read",
   "user/Encounter.read",
+  "user/Observation.read",
 ];
 
 const body = {
